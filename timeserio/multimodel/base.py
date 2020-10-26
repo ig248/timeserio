@@ -2,7 +2,7 @@ from typing import Dict
 
 from sklearn.base import BaseEstimator
 
-from timeserio.externals import keras
+from timeserio import externals
 from timeserio.batches import utils as batch_utils
 from ..keras.multinetwork import MultiNetworkBase
 from ..pipeline import MultiPipeline
@@ -16,7 +16,6 @@ def make_pipeline_generator(*args, **kwargs):
 
 class MultiModel(BaseEstimator):
     """Multi-part model with pipelines."""
-
     def __init__(
         self, *, multinetwork: MultiNetworkBase, multipipeline: MultiPipeline,
         manifold: Dict
@@ -94,9 +93,9 @@ class MultiModel(BaseEstimator):
         generator = make_pipeline_generator(
             x_pipes=x_pipes, y_pipes=y_pipes, df_generator=df_generator
         )
-        return self.multinetwork.predict_generator(generator,
-                                                   model=model,
-                                                   **kwargs)
+        return self.multinetwork.predict_generator(
+            generator, model=model, **kwargs
+        )
 
     def fit_generator(self, df_generator, model=None, **kwargs):
         """Fit one of the sub-networks from a DataFrame generator."""
@@ -105,7 +104,7 @@ class MultiModel(BaseEstimator):
             is_none = (kwargs['validation_data'] is None)
             is_sequence = isinstance(
                 kwargs['validation_data'],
-                (keras.utils.Sequence, batch_utils.Sequence)
+                (externals.keras.utils.Sequence, batch_utils.Sequence)
             )
             if is_none:
                 pass
@@ -141,9 +140,7 @@ class MultiModel(BaseEstimator):
             x_pipes=x_pipes, y_pipes=y_pipes, df_generator=df_generator
         )
         metrics = self.multinetwork.evaluate_generator(
-            generator,
-            model=model,
-            **kwargs
+            generator, model=model, **kwargs
         )
         return metrics
 

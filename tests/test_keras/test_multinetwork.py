@@ -5,12 +5,7 @@ import numpy.testing as npt
 import pytest
 from tensorflow.keras.initializers import RandomUniform
 from tensorflow.keras.layers import (
-    Input,
-    Dense,
-    Concatenate,
-    Embedding,
-    Flatten,
-    BatchNormalization
+    Input, Dense, Concatenate, Embedding, Flatten, BatchNormalization
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import SGD, Adam
@@ -31,7 +26,6 @@ class MinimalSubClass(MultiNetworkBase):
 
 class SimpleMultiNetwork(MultiNetworkBase):
     """A simple feature-based forecaster."""
-
     def _model(
         self,
         forecaster_features=1,
@@ -74,7 +68,6 @@ class SimpleMultiNetwork(MultiNetworkBase):
 
 class BatchNormNetwork(MultiNetworkBase):
     """This network changes get_weights/set_weights order when frozen."""
-
     def _model(self):
         # Encoder
         encoder_input = Input((1, ))
@@ -97,33 +90,30 @@ class BatchNormNetwork(MultiNetworkBase):
 
 class EmbedderForecasterNetwork(MultiNetworkBase):
     """A simple feature-based forecaster."""
-
     def _model(
-            self,
-            *,
-            embedding_dim=2,
-            embedding_max_size=10000,
-            forecaster_features=1,
-            forecaster_hidden_units=(8, 8),
-            lr=0.1
+        self,
+        *,
+        embedding_dim=2,
+        embedding_max_size=10000,
+        forecaster_features=1,
+        forecaster_hidden_units=(8, 8),
+        lr=0.1
     ):
         # Embedder
         embedding_initialize = RandomUniform(minval=-1, maxval=1)
-        customer_in = Input((1,))
-        embedding_out = Embedding(input_dim=embedding_max_size,
-                                  output_dim=embedding_dim, input_length=1,
-                                  embeddings_initializer=embedding_initialize
-                                  )(customer_in)
+        customer_in = Input((1, ))
+        embedding_out = Embedding(
+            input_dim=embedding_max_size,
+            output_dim=embedding_dim,
+            input_length=1,
+            embeddings_initializer=embedding_initialize
+        )(customer_in)
         embedding_out = Flatten()(embedding_out)
-        embedding_model = Model(
-            customer_in,
-            embedding_out,
-            name='Embedder'
-        )
+        embedding_model = Model(customer_in, embedding_out, name='Embedder')
 
         # Forecaster
-        features_in = Input((forecaster_features,))
-        embedding_in = Input((embedding_dim,))
+        features_in = Input((forecaster_features, ))
+        embedding_in = Input((embedding_dim, ))
         forecaster_output = Concatenate()([features_in, embedding_in])
         # append final output
         forecaster_dense_units = list(forecaster_hidden_units) + [1]
@@ -134,9 +124,7 @@ class EmbedderForecasterNetwork(MultiNetworkBase):
                 name='forecaster_dense_{}'.format(idx)
             )(forecaster_output)
         forecaster_model = Model(
-            [features_in, embedding_in],
-            forecaster_output,
-            name='Forecaster'
+            [features_in, embedding_in], forecaster_output, name='Forecaster'
         )
 
         # Combined model
@@ -144,9 +132,7 @@ class EmbedderForecasterNetwork(MultiNetworkBase):
             [features_in, embedding_model(customer_in)]
         )
         combined_model = Model(
-            [features_in, customer_in],
-            combined_output,
-            name='Combined'
+            [features_in, customer_in], combined_output, name='Combined'
         )
         optimizer = Adam(lr=lr)
         combined_model.compile(optimizer=optimizer, loss='mse')
@@ -157,32 +143,29 @@ class EmbedderForecasterNetwork(MultiNetworkBase):
         }
 
     def _callbacks(
-            self,
-            *,
-            es_params={
-                'patience': 20,
-                'monitor': 'val_loss'
-            },
-            lr_params={
-                'monitor': 'val_loss',
-                'patience': 4,
-                'factor': 0.2
-            }
+        self,
+        *,
+        es_params={
+            'patience': 20,
+            'monitor': 'val_loss'
+        },
+        lr_params={
+            'monitor': 'val_loss',
+            'patience': 4,
+            'factor': 0.2
+        }
     ):
         early_stopping = EarlyStopping(**es_params)
         learning_rate_reduction = ReduceLROnPlateau(**lr_params)
         return {
             'forecaster': [],
             'embedder': [],
-            'combined': [
-                early_stopping, learning_rate_reduction
-            ]
+            'combined': [early_stopping, learning_rate_reduction]
         }
 
 
 class TestBaseClass:
     """Test asbtract base class."""
-
     def test_base_class_abstract(self):
         with pytest.raises(TypeError):
             MultiNetworkBase(param='value')
@@ -220,7 +203,6 @@ def test_reproducibility():
 
 class TestSubClass:
     """Test subclass."""
-
     @pytest.fixture
     def testclass(self):
         return SimpleMultiNetwork
@@ -481,9 +463,12 @@ class TestSubClass:
         assert multinetwork.trainable_models == ['forecaster']
 
         multinetwork.fit(
-            x, y, model='forecaster',
+            x,
+            y,
+            model='forecaster',
             trainable_models=[],
-            batch_size=100, epochs=3
+            batch_size=100,
+            epochs=3
         )
         error = multinetwork.evaluate(x, y, model='forecaster')
         weights = multinetwork.model['forecaster'].get_weights()
@@ -581,9 +566,7 @@ class TestMultiNetworkSerialization:
         import timeserio.keras.multinetwork
 
         # replace `keras` with a broken non-module
-        mocker.patch.object(
-            timeserio.keras.multinetwork, "keras", None
-        )
+        mocker.patch.object(timeserio.externals, "keras", None)
 
         params = multinetwork.get_params()
         s = dumps(multinetwork)
@@ -593,9 +576,7 @@ class TestMultiNetworkSerialization:
             new_multinetwork = loads(s)
 
         # if both are mocked correctly, "unsafe" unpickling works again
-        mocker.patch.object(
-            timeserio.keras.multinetwork, "HABEMUS_KERAS", False
-        )
+        mocker.patch.object(timeserio.externals, "HABEMUS_KERAS", False)
         new_multinetwork = loads(s)
         new_params = new_multinetwork.get_params()
 

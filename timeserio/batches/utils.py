@@ -1,5 +1,7 @@
 from abc import abstractmethod
 
+from timeserio import externals
+
 
 def ceiling_division(dividend, divisor):
     if not dividend:
@@ -12,7 +14,6 @@ class Sequence(object):
 
     Defined here to avoid importing tf/keras unnecesseraly.
     """
-
     @abstractmethod
     def __getitem__(self, index):
         """Gets batch at position `index`.
@@ -39,3 +40,29 @@ class Sequence(object):
         """Create a generator that iterate over the Sequence."""
         for item in (self[i] for i in range(len(self))):
             yield item
+
+
+def to_keras_gen(sequence):
+    """Convert to keras.utils.Sequence"""
+    keras_seq = externals.keras.utils.Sequence
+    timeserio_seq = Sequence
+    if isinstance(sequence, timeserio_seq):
+
+        class KerasSequence(keras_seq):
+            _sequence = sequence
+
+            def __getitem__(inner_self, index):
+                return inner_self._sequence[index]
+
+            def __len__(inner_self):
+                return len(inner_self._sequence)
+
+            def on_epoch_end(inner_self):
+                return inner_self._sequence.on_epoch_end()
+
+            def __iter__(inner_self):
+                return iter(inner_self._sequence)
+
+        return KerasSequence()
+
+    return sequence

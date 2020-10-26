@@ -4,7 +4,8 @@ import copy
 from typing import Optional, Dict, Collection
 import warnings
 
-from timeserio.externals import keras, HABEMUS_KERAS
+from timeserio import externals
+from timeserio.batches import utils as batch_utils
 from ..utils.functools import get_default_args
 from .utils import iterlayers, has_arg
 
@@ -48,7 +49,6 @@ class MultiNetworkBase(abc.ABC):
 
 
     """
-
     def __init__(self, **hyperparams):
         self._model_instance = None
         self.hyperparams = hyperparams
@@ -58,11 +58,13 @@ class MultiNetworkBase(abc.ABC):
 
     # Abstract methods that need sub-classing #
     @abc.abstractmethod
-    def _model(self, **kwargs) -> Dict[str, "keras.models.Model"]:
+    def _model(self, **kwargs) -> Dict[str, "externals.keras.models.Model"]:
         """Build and return a list of keras models."""
         raise NotImplementedError
 
-    def _callbacks(self, **kwargs) -> Dict[str, "keras.callbacks.Callback"]:
+    def _callbacks(
+        self, **kwargs
+    ) -> Dict[str, "externals.keras.callbacks.Callback"]:
         """Build and return a list of keras callbacks."""
         return {}
 
@@ -70,7 +72,7 @@ class MultiNetworkBase(abc.ABC):
     # Helper functions ##
     @property
     def _funcs_with_legal_params(self):
-        Sequential = keras.models.Sequential
+        Sequential = externals.keras.models.Sequential
         methods = [
             Sequential.fit, Sequential.fit_generator, Sequential.predict,
             Sequential.predict_classes, Sequential.evaluate
@@ -78,8 +80,7 @@ class MultiNetworkBase(abc.ABC):
         # fix for tensorflow 2.2.0 using method wrappers
         # these were removed again in 2.3.0
         unwrapped_methods = [
-            getattr(method, "__wrapped__", method)
-            for method in methods
+            getattr(method, "__wrapped__", method) for method in methods
         ]
         return [*unwrapped_methods, self._model, self._callbacks]
 
@@ -126,7 +127,7 @@ class MultiNetworkBase(abc.ABC):
             ValueError: if any member of `params` is not a valid argument.
 
         """
-        if not HABEMUS_KERAS:  # for unpickling without keras/tensorflow
+        if not externals.HABEMUS_KERAS:  # for unpickling without tensorflow
             return
 
         for params_name in params:
@@ -320,8 +321,8 @@ class MultiNetworkBase(abc.ABC):
         Use argument if a list is provided, else use self.trainable_models.
         """
         self._freeze_models_except(
-            trainable_models if trainable_models is not None
-            else self.trainable_models
+            trainable_models if trainable_models is not None else self.
+            trainable_models
         )
 
     def _unfreeze(self):
@@ -330,8 +331,13 @@ class MultiNetworkBase(abc.ABC):
 
     @contextlib.contextmanager
     def _model_context(
-        self, *, reset_weights: bool, reset_optimizers: bool,
-        reset_history: bool, freeze: bool, training: bool = False,
+        self,
+        *,
+        reset_weights: bool,
+        reset_optimizers: bool,
+        reset_history: bool,
+        freeze: bool,
+        training: bool = False,
         persist_model: bool = False,
         trainable_models: Optional[Collection[str]] = None,
     ):
@@ -412,7 +418,9 @@ class MultiNetworkBase(abc.ABC):
         else:
             trainable_models = None
 
-        fit_args = self._filter_hyperparams(keras.models.Sequential.fit)
+        fit_args = self._filter_hyperparams(
+            externals.keras.models.Sequential.fit
+        )
         fit_args.update(callbacks=self.callbacks.get(model))
         fit_args.update(kwargs)
 
@@ -426,9 +434,14 @@ class MultiNetworkBase(abc.ABC):
             trainable_models=trainable_models,
         )
         with training_context:
+            if "validation_data" in fit_args:
+                fit_args["validation_data"] = batch_utils.to_keras_gen(
+                    fit_args["validation_data"]
+                )
             self.model[model].fit(x, y, **fit_args)
         self._add_history_record(
-            model=model, history=history_cbk.history,
+            model=model,
+            history=history_cbk.history,
             trainable_models=trainable_models
         )
         return history_cbk
@@ -465,7 +478,7 @@ class MultiNetworkBase(abc.ABC):
             trainable_models = None
 
         fit_args = self._filter_hyperparams(
-            keras.models.Sequential.fit_generator
+            externals.keras.models.Sequential.fit_generator
         )
         fit_args.update(callbacks=self.callbacks.get(model))
         fit_args.update(kwargs)
@@ -480,9 +493,15 @@ class MultiNetworkBase(abc.ABC):
             trainable_models=trainable_models,
         )
         with training_context:
+            generator = batch_utils.to_keras_gen(generator)
+            if "validation_data" in fit_args:
+                fit_args["validation_data"] = batch_utils.to_keras_gen(
+                    fit_args["validation_data"]
+                )
             self.model[model].fit_generator(generator, **fit_args)
         self._add_history_record(
-            model=model, history=history_cbk.history,
+            model=model,
+            history=history_cbk.history,
             trainable_models=trainable_models
         )
         return history_cbk
@@ -503,7 +522,9 @@ class MultiNetworkBase(abc.ABC):
 
         """
         self.check_model_name(model)
-        pred_kwargs = self._filter_hyperparams(keras.models.Sequential.predict)
+        pred_kwargs = self._filter_hyperparams(
+            externals.keras.models.Sequential.predict
+        )
         pred_kwargs.update(kwargs)
         with self._prediction_context():
             predictions = self.model[model].predict(x, **pred_kwargs)
@@ -526,9 +547,10 @@ class MultiNetworkBase(abc.ABC):
         """
         self.check_model_name(model)
         pred_kwargs = self._filter_hyperparams(
-            keras.models.Sequential.predict_generator, kwargs
+            externals.keras.models.Sequential.predict_generator, kwargs
         )
         with self._prediction_context():
+            generator = batch_utils.to_keras_gen(generator)
             predictions = (
                 self.model[model].predict_generator(generator, **pred_kwargs)
             )
@@ -554,7 +576,7 @@ class MultiNetworkBase(abc.ABC):
         """
         self.check_model_name(model)
         ev_kwargs = self._filter_hyperparams(
-            keras.models.Sequential.evaluate, kwargs
+            externals.keras.models.Sequential.evaluate, kwargs
         )
         with self._prediction_context():
             metrics = self.model[model].evaluate(x, y, **ev_kwargs)
@@ -587,9 +609,10 @@ class MultiNetworkBase(abc.ABC):
         """
         self.check_model_name(model)
         ev_kwargs = self._filter_hyperparams(
-            keras.models.Sequential.evaluate, kwargs
+            externals.keras.models.Sequential.evaluate, kwargs
         )
         with self._prediction_context():
+            generator = batch_utils.to_keras_gen(generator)
             evaluation = (
                 self.model[model].evaluate_generator(generator, **ev_kwargs)
             )
