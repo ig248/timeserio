@@ -1662,7 +1662,7 @@
         },
         "tensorpandas": {
             "git": "https://github.com/ig248/tensorpandas.git",
-            "ref": "a94cd0211c560c4c84c06d201beca00ea15c4535"
+            "ref": "47092cf57b35666b28231d37bfd8c2a55ea64178"
         },
         "termcolor": {
             "hashes": [
