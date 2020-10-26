@@ -3,6 +3,7 @@ from typing import Dict
 from sklearn.base import BaseEstimator
 
 from timeserio.externals import keras
+from timeserio.batches import utils as batch_utils
 from ..keras.multinetwork import MultiNetworkBase
 from ..pipeline import MultiPipeline
 
@@ -104,7 +105,7 @@ class MultiModel(BaseEstimator):
             is_none = (kwargs['validation_data'] is None)
             is_sequence = isinstance(
                 kwargs['validation_data'],
-                keras.utils.Sequence
+                (keras.utils.Sequence, batch_utils.Sequence)
             )
             if is_none:
                 pass

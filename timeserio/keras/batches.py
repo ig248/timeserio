@@ -1,7 +1,7 @@
-from timeserio.externals import keras
+from timeserio.batches import utils as batch_utils
 
 
-class ArrayBatchGenerator(keras.utils.Sequence):
+class ArrayBatchGenerator(batch_utils.Sequence):
     """Generate batches from X, y arrays.
 
     Mainly used for testing `fit_generator` and related functions

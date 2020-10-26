@@ -1,7 +1,7 @@
 import abc
 
-from timeserio.externals import keras
+from timeserio.batches import utils as batch_utils
 
 
-class BatchGenerator(keras.utils.Sequence, abc.ABC):
+class BatchGenerator(batch_utils.Sequence, abc.ABC):
     pass
